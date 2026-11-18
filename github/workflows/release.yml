@@ -1,0 +1,39 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npx vite build --base=./
+
+      - name: Package single-file build
+        run: cp dist/index.html "sugreev-os-${GITHUB_REF_NAME}.html"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: sugreev-os-${{ github.ref_name }}.html
+          generate_release_notes: true
+          body: |
+            ## Sugreev OS ${{ github.ref_name }}
+
+            **How to run:** download `sugreev-os-${{ github.ref_name }}.html` and open it in any modern browser.
+            Login as **Vaibhav Thakur** — password `sugreev`.
+
+            > Educational simulator. No real scanning or exploitation takes place.

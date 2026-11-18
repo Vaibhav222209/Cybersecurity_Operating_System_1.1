@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Build & test (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 22]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check
+        run: npx tsc --noEmit
+
+      - name: Production build
+        run: npm run build
+
+      - name: Shell smoke tests
+        run: |
+          mkdir -p .tmp
+          npx esbuild tests/shell.smoke.ts --bundle --platform=node --format=esm --outfile=.tmp/shell.smoke.mjs --log-level=warning
+          node .tmp/shell.smoke.mjs
+
+      - name: UI smoke tests (jsdom)
+        run: |
+          npx esbuild tests/ui.smoke.tsx --bundle --platform=node --format=esm --jsx=automatic --loader:.css=empty --external:jsdom --outfile=.tmp/ui.smoke.mjs --log-level=warning
+          node .tmp/ui.smoke.mjs
+
+      - name: Upload build artifact
+        if: matrix.node == 22
+        uses: actions/upload-artifact@v4
+        with:
+          name: sugreev-os-dist
+          path: dist/index.html
+          retention-days: 14
